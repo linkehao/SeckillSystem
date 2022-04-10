@@ -10,4 +10,13 @@ public class Stock implements Serializable {
     Integer id;
     String name;
     Integer stock;
+
+    @Override
+    public String toString() {
+        return "Stock{" +
+                "id=" + id +
+                ", name='" + name + '\'' +
+                ", stock=" + stock +
+                '}';
+    }
 }

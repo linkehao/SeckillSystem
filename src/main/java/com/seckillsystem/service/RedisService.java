@@ -33,4 +33,9 @@ public class RedisService {
     public Long decrBy(String key) {
         return redisTemplate.opsForValue().decrement(key);
     }
+
+    public void increBy(String key) {
+        redisTemplate.opsForValue().increment(key);
+    }
+
 }

@@ -10,4 +10,13 @@ public class Order implements Serializable {
     Integer id;
     String orderName;
     String orderUser;
+
+    @Override
+    public String toString() {
+        return "Order{" +
+                "id=" + id +
+                ", orderName='" + orderName + '\'' +
+                ", orderUser='" + orderUser + '\'' +
+                '}';
+    }
 }
