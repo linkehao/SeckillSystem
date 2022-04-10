@@ -1,21 +1,21 @@
 package com.seckillsystem.config;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.seckillsystem.service.RedisService;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.*;
+import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.rabbit.listener.RabbitListenerContainerFactory;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
 
 @Configuration
@@ -39,8 +39,8 @@ public class MyRabbitMQConfig {
     //订单路由键
     public static final String ORDER_ROUTING_KEY = "ORDER_ROUTING_KEY";
 
-    @Autowired
-    private ConnectionFactory connectionFactory;
+//    @Autowired
+//    private ConnectionFactory connectionFactory;
 
     @Autowired
     private RedisService redisService;
@@ -53,33 +53,44 @@ public class MyRabbitMQConfig {
         return new Jackson2JsonMessageConverter();
     }
 
+    /**
+     * 重写RabbitListenerContainerFactory，指定手动提交，否则在配置文件配了手动ack也不生效
+     * @param connectionFactory
+     * @return
+     */
     @Bean
-    public RabbitTemplate rabbitTemplate() {
-        RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
+    public RabbitListenerContainerFactory<?> rabbitListenerContainerFactory(ConnectionFactory connectionFactory){
+        SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
+        factory.setConnectionFactory(connectionFactory);
+        factory.setMessageConverter(new Jackson2JsonMessageConverter());
+        // 指定手动提交
+        factory.setAcknowledgeMode(AcknowledgeMode.MANUAL);
+        return factory;
+    }
+
+    @Bean
+    public RabbitTemplate rabbitTemplate(ConnectionFactory factory) {
+        RabbitTemplate rabbitTemplate = new RabbitTemplate(factory);
         rabbitTemplate.setMessageConverter(messageConverter());
 
         // 消息是否成功发送到Exchange
         rabbitTemplate.setConfirmCallback(new RabbitTemplate.ConfirmCallback() {
+            @SneakyThrows
             @Override
             public void confirm(CorrelationData correlationData, boolean ack, String cause) {
-                System.out.println(correlationData);
+//                System.out.println(correlationData);
 //                System.out.println(correlationData.getReturned().getMessage().getMessageProperties());
 
                 String body = new String(correlationData.getReturned().getMessage().getBody());
-                Map map = null;
-                try {
-                    map = objectMapper.readValue(body, Map.class);
-                } catch (JsonProcessingException e) {
-                    e.printStackTrace();
-                }
-                System.out.println(map.get("stockName"));
-                System.out.println(map.get("username"));
+                Map map = objectMapper.readValue(body, Map.class);
 
+//                System.out.println(map.get("stockName"));
+//                System.out.println(map.get("username"));
                 if (ack) {
                     log.info("消息成功发送到Exchange");
                 } else {
                     log.info("消息发送到Exchange失败", correlationData, cause);
-                    // 发送到交换机失败，回滚redis数据
+                    // 发送到交换机失败，恢复redis数据
 //                System.out.println(message);
                 redisService.increBy((String) map.get("stockName"));
                 }
@@ -102,10 +113,14 @@ public class MyRabbitMQConfig {
         rabbitTemplate.setMandatory(true);
         // 消息是否从Exchange路由到Queue, 注意: 这是一个失败回调, 只有消息从Exchange路由到Queue失败才会回调这个方法
         rabbitTemplate.setReturnsCallback(new RabbitTemplate.ReturnsCallback() {
+            @SneakyThrows
             @Override
             public void returnedMessage(ReturnedMessage returnedMessage) {
-
-                System.out.println("交换机到队列失败：" + returnedMessage);
+                String body = new String(returnedMessage.getMessage().getBody());
+                Map map = objectMapper.readValue(body, Map.class);
+                // 交换机发送到队列失败，恢复redis数据
+//                redisService.increBy((String) map.get("stockName"));
+                System.out.println("交换机到队列失败：" + map.get("stockName"));
             }
         });
 
@@ -121,7 +136,7 @@ public class MyRabbitMQConfig {
     //创建库存队列
     @Bean
     public Queue getStoryQueue() {
-        return new Queue(STORY_QUEUE);
+        return new Queue(STORY_QUEUE, true);
     }
 
     //库存交换机和库存队列绑定
@@ -133,7 +148,7 @@ public class MyRabbitMQConfig {
     //创建订单队列
     @Bean
     public Queue getOrderQueue() {
-        return new Queue(ORDER_QUEUE);
+        return new Queue(ORDER_QUEUE, true);
     }
 
     //创建订单交换机

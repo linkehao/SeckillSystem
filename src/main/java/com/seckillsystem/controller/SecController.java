@@ -59,25 +59,24 @@ public class SecController {
              * 说明该商品的库存量有剩余，可以进行下订单操作
              */
             log.info("用户：{}秒杀该商品：{}库存有余，可以进行下订单操作", username, stockName);
-            Stock stock = new Stock();
-            stock.setName(stockName);
             HashMap<String, String> map = new HashMap<>();
             map.put("stockName", stockName);
+            map.put("username", username);
             //发消息给库存消息队列，将库存数据减一
             Message message = MessageBuilder.withBody(objectMapper.writeValueAsBytes(map)).setDeliveryMode(MessageDeliveryMode.PERSISTENT).build();
             CorrelationData correlationData = new CorrelationData();
             correlationData.setReturnedMessage(message);
-            rabbitTemplate.convertAndSend(MyRabbitMQConfig.STORY_EXCHANGE, MyRabbitMQConfig.STORY_ROUTING_KEY, stockName, correlationData);
+            rabbitTemplate.convertAndSend(MyRabbitMQConfig.STORY_EXCHANGE, MyRabbitMQConfig.STORY_ROUTING_KEY, map, correlationData);
 
             //发消息给订单消息队列，创建订单
-            Order order = new Order();
-            order.setOrderName(stockName);
-            order.setOrderUser(username);
-            map.put("username", username);
-            Message message1 = MessageBuilder.withBody(objectMapper.writeValueAsBytes(map)).setDeliveryMode(MessageDeliveryMode.PERSISTENT).build();
-            CorrelationData correlationData1 = new CorrelationData();
-            correlationData1.setReturnedMessage(message1);
-            rabbitTemplate.convertAndSend(MyRabbitMQConfig.ORDER_EXCHANGE, MyRabbitMQConfig.ORDER_ROUTING_KEY, order, correlationData1);
+//            Order order = new Order();
+//            order.setOrderName(stockName);
+//            order.setOrderUser(username);
+////            map.put("username", username);
+//            Message message1 = MessageBuilder.withBody(objectMapper.writeValueAsBytes(map)).setDeliveryMode(MessageDeliveryMode.PERSISTENT).build();
+//            CorrelationData correlationData1 = new CorrelationData();
+//            correlationData1.setReturnedMessage(message1);
+//            rabbitTemplate.convertAndSend(MyRabbitMQConfig.ORDER_EXCHANGE, MyRabbitMQConfig.ORDER_ROUTING_KEY, order, correlationData1);
             info = "用户" + username + "秒杀" + stockName + "成功";
         } else {
             /**
