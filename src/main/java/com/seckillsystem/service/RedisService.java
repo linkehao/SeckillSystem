@@ -34,8 +34,26 @@ public class RedisService {
         return redisTemplate.opsForValue().decrement(key);
     }
 
-    public void increBy(String key) {
-        redisTemplate.opsForValue().increment(key);
+    public Long increBy(String key) {
+       return  redisTemplate.opsForValue().increment(key);
+    }
+
+    /**
+     * 获取指定key的值
+     * @param key
+     * @return
+     */
+    public Object get(String key) {
+        return redisTemplate.opsForValue().get(key);
+    }
+
+    /**
+     * 删除key
+     * @param key
+     * @return
+     */
+    public Object delete(String key) {
+        return redisTemplate.delete(key);
     }
 
 }

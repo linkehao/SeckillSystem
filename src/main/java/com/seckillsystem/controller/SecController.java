@@ -5,7 +5,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.seckillsystem.config.MyRabbitMQConfig;
 import com.seckillsystem.pojo.Order;
-import com.seckillsystem.pojo.Stock;
 import com.seckillsystem.service.OrderService;
 import com.seckillsystem.service.RedisService;
 import com.seckillsystem.service.StockService;
@@ -51,7 +50,14 @@ public class SecController {
     @ResponseBody
     public String sec(@RequestParam(value = "username") String username, @RequestParam(value = "stockName") String stockName) throws JsonProcessingException {
         log.info("参加秒杀的用户是：{}，秒杀的商品是：{}", username, stockName);
-        String info = null;
+        String info = "";
+
+         // 限制每个用户只能下一单
+        Long count = redisService.increBy(username);
+        if (count > 1) {
+             log.info("用户：{}已参与过这次秒杀，请勿再次参与", username);
+             return "用户" + username + "已参与过这次秒杀，请勿再次参与";
+         }
         //调用redis给相应商品库存量减一
         Long decrByResult = redisService.decrBy(stockName);
         if (decrByResult >= 0) {
@@ -66,17 +72,7 @@ public class SecController {
             Message message = MessageBuilder.withBody(objectMapper.writeValueAsBytes(map)).setDeliveryMode(MessageDeliveryMode.PERSISTENT).build();
             CorrelationData correlationData = new CorrelationData();
             correlationData.setReturnedMessage(message);
-            rabbitTemplate.convertAndSend(MyRabbitMQConfig.STORY_EXCHANGE, MyRabbitMQConfig.STORY_ROUTING_KEY, map, correlationData);
-
-            //发消息给订单消息队列，创建订单
-//            Order order = new Order();
-//            order.setOrderName(stockName);
-//            order.setOrderUser(username);
-////            map.put("username", username);
-//            Message message1 = MessageBuilder.withBody(objectMapper.writeValueAsBytes(map)).setDeliveryMode(MessageDeliveryMode.PERSISTENT).build();
-//            CorrelationData correlationData1 = new CorrelationData();
-//            correlationData1.setReturnedMessage(message1);
-//            rabbitTemplate.convertAndSend(MyRabbitMQConfig.ORDER_EXCHANGE, MyRabbitMQConfig.ORDER_ROUTING_KEY, order, correlationData1);
+            rabbitTemplate.convertAndSend(MyRabbitMQConfig.STORY_ORDER_EXCHANGE, MyRabbitMQConfig.STORY_ORDER_ROUTING_KEY, map, correlationData);
             info = "用户" + username + "秒杀" + stockName + "成功";
         } else {
             /**

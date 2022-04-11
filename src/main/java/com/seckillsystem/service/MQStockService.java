@@ -14,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.Map;
 
 @Service
 @Slf4j
@@ -31,7 +30,7 @@ public class MQStockService {
     /**
      * 监听库存消息队列，并消费
      */
-    @RabbitListener(queues = MyRabbitMQConfig.STORY_QUEUE)
+    @RabbitListener(queues = MyRabbitMQConfig.STORY_ORDER_QUEUE)
     @Transactional
     public void decrByStock(Message message, Channel channel) {
 
@@ -42,7 +41,6 @@ public class MQStockService {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-
             String body = new String(message.getBody());
             HashMap<String, String> map = null;
             try {
@@ -50,7 +48,6 @@ public class MQStockService {
             } catch (JsonProcessingException e) {
                 e.printStackTrace();
             }
-
 
             String stockName = map.get("stockName");
             String username = map.get("username");
@@ -73,16 +70,8 @@ public class MQStockService {
              * 第一个参数:消息的唯一标识
              * 第二个参数:是否开启批处理
              */
-//            channel.basicReject(message.getMessageProperties().getDeliveryTag(), true);
             try {
                 channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-//                channel.basicNack(message.getMessageProperties().getDeliveryTag(),false,false);
-            try {
-                channel.basicReject(message.getMessageProperties().getDeliveryTag(), true);
             } catch (IOException e) {
                 e.printStackTrace();
             }
